@@ -1,4 +1,3 @@
-// main.cpp
 #include "simulation.h"
 #include "materials.h"
 #include <SDL.h>

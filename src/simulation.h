@@ -1,5 +1,4 @@
 #pragma once
-// simulation.h
 // Simulation class interface for falling-sand multi-material CA
 
 #include "materials.h"

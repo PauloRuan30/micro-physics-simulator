@@ -4,7 +4,7 @@ Dependencies:
 
 Build & run:
   xmake
-  xmake run sand
+  xmake run 
 
 Controls:
  - Left-drag: paint
