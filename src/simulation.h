@@ -1,5 +1,4 @@
 #pragma once
-// simulation.h
 // Simulation class interface for falling-sand multi-material CA
 
 #include "materials.h"
@@ -45,4 +44,5 @@ private:
     Cell paint_material;
     int view_mode;
     unsigned rng_seed;
+    // RNG functions hidden in cpp
 };

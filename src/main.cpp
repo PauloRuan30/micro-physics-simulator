@@ -1,39 +1,12 @@
-// main.cpp
 #include "simulation.h"
 #include "materials.h"
 #include <SDL.h>
 #include <vector>
 #include <iostream>
-#include <cmath>
 
-static int GRID_W = 320;
-static int GRID_H = 200;
-static int SCALE = 2;
-
-// helper: draw filled circular brush preview (grid-cell aligned)
-static void draw_brush_preview(SDL_Renderer* renderer, int mx, int my, int brush, int scale) {
-    // convert mouse pixel -> grid coords
-    int gx = mx / scale;
-    int gy = my / scale;
-
-    // semi-transparent color
-    SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
-    SDL_SetRenderDrawColor(renderer, 255, 255, 255, 96); // white translucent
-
-    for (int dy = -brush; dy <= brush; ++dy) {
-        for (int dx = -brush; dx <= brush; ++dx) {
-            if (dx*dx + dy*dy <= brush*brush) {
-                int x = gx + dx;
-                int y = gy + dy;
-                if (x < 0 || x >= GRID_W || y < 0 || y >= GRID_H) continue;
-                SDL_Rect r{ x * scale, y * scale, scale, scale };
-                SDL_RenderFillRect(renderer, &r);
-            }
-        }
-    }
-    // reset blend
-    SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
-}
+static const int GRID_W = 320;
+static const int GRID_H = 200;
+static const int SCALE = 2;
 
 int main(int argc, char** argv) {
     if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS) != 0) {
@@ -41,7 +14,7 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    SDL_Window* window = SDL_CreateWindow("Sand+Water+Wall+AR - multi-material",
+    SDL_Window* window = SDL_CreateWindow("Sand+Water+Wall - multi-material",
         SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
         GRID_W * SCALE, GRID_H * SCALE, SDL_WINDOW_SHOWN);
     if (!window) { std::cerr << "CreateWindow: " << SDL_GetError() << "\n"; SDL_Quit(); return 1; }
@@ -64,12 +37,11 @@ int main(int argc, char** argv) {
     const Uint32 target_ms = 1000 / 60;
 
     std::cout << "Controls:\n";
-    std::cout << " Left-drag: paint\n 1=SAND 2=WATER 3=WALL 4=AR\n V=view-mode  Space=pause  .=step  C=clear\n Up/Down=brush  [/]=inclusion density down/up\n\n";
+    std::cout << " Left-drag: paint\n 1=SAND 2=WATER 3=WALL\n V=view-mode  Space=pause  .=step  C=clear\n Up/Down=brush  [/]=inclusion density down/up\n\n";
 
     while (running) {
         Uint32 t0 = SDL_GetTicks();
         SDL_Event ev;
-        int mouse_x = 0, mouse_y = 0;
         while (SDL_PollEvent(&ev)) {
             if (ev.type == SDL_QUIT) running = false;
             else if (ev.type == SDL_KEYDOWN) {
@@ -82,8 +54,7 @@ int main(int argc, char** argv) {
                     case SDLK_1: sim.set_paint_material(SAND); std::cout << "Paint=SAND\n"; break;
                     case SDLK_2: sim.set_paint_material(WATER); std::cout << "Paint=WATER\n"; break;
                     case SDLK_3: sim.set_paint_material(WALL); std::cout << "Paint=WALL\n"; break;
-                    case SDLK_4: sim.set_paint_material(AR); std::cout << "Paint=AR\n"; break;
-                    case SDLK_v: sim.set_view_mode((sim.get_view_mode()+1)%5); std::cout << "View=" << sim.get_view_mode() << "\n"; break;
+                    case SDLK_v: sim.set_view_mode((sim.get_view_mode()+1)%4); std::cout << "View=" << sim.get_view_mode() << "\n"; break;
                     case SDLK_PERIOD: { paused = true; sim.step(1, frame_count); } break; // single-step
                     case SDLK_LEFTBRACKET: sim.set_inclusion_chance(std::max(0.0, sim.get_inclusion_chance() - 0.001)); std::cout << "incl=" << sim.get_inclusion_chance() << "\n"; break;
                     case SDLK_RIGHTBRACKET: sim.set_inclusion_chance(std::min(0.1, sim.get_inclusion_chance() + 0.001)); std::cout << "incl=" << sim.get_inclusion_chance() << "\n"; break;
@@ -96,16 +67,16 @@ int main(int argc, char** argv) {
             }
         }
 
-        SDL_GetMouseState(&mouse_x, &mouse_y);
-
         if (mouse_down) {
-            int gx = mouse_x / SCALE;
-            int gy = mouse_y / SCALE;
+            int mx, my;
+            SDL_GetMouseState(&mx, &my);
+            int gx = mx / SCALE;
+            int gy = my / SCALE;
             sim.paint_at(gx, gy, brush);
         }
 
         if (!paused) {
-            sim.step(2, frame_count);
+            sim.step(2, frame_count); // substeps=2 default
         }
 
         // fill pixels by querying simulation
@@ -119,16 +90,6 @@ int main(int argc, char** argv) {
         SDL_RenderClear(renderer);
         SDL_Rect dst{0,0, GRID_W * SCALE, GRID_H * SCALE};
         SDL_RenderCopy(renderer, tex, nullptr, &dst);
-
-        // draw brush preview (if not clicking, or even while clicking)
-        draw_brush_preview(renderer, mouse_x, mouse_y, brush, SCALE);
-
-        // draw brush size numeric indicator (top-left)
-        // simple textless numeric indicator: small rectangle per size (or you can print to console)
-        SDL_SetRenderDrawColor(renderer, 255,255,255,200);
-        SDL_Rect ui{8,8, 6 + brush, 10};
-        SDL_RenderFillRect(renderer, &ui);
-
         SDL_RenderPresent(renderer);
 
         Uint32 t1 = SDL_GetTicks();
