@@ -2,17 +2,15 @@
 #include <SDL2/SDL.h>
 #include <iostream>
 #include <string>
+#include <cmath>
 #include "simulation.h"
 #include "materials.h"
 
-// Simulation & rendering parameters
 const int GRID_W = 320;
 const int GRID_H = 180;
-const int SCALE = 3; // pixels per grid cell
+const int SCALE = 3;
 
-// helper: create SDL texture from grid (ARGB32)
 static void upload_texture(SDL_Texture* tex, Simulation &sim) {
-    // texture format expects 32-bit pixels in format SDL_PIXELFORMAT_ARGB8888
     void* pixels;
     int pitch;
     if (SDL_LockTexture(tex, nullptr, &pixels, &pitch) != 0) {
@@ -29,6 +27,65 @@ static void upload_texture(SDL_Texture* tex, Simulation &sim) {
     SDL_UnlockTexture(tex);
 }
 
+static void draw_filled_circle(SDL_Renderer* ren, int cx, int cy, int radius, 
+                                uint8_t r, uint8_t g, uint8_t b, uint8_t a) {
+    SDL_SetRenderDrawBlendMode(ren, SDL_BLENDMODE_BLEND);
+    SDL_SetRenderDrawColor(ren, r, g, b, a);
+    for (int dy = -radius; dy <= radius; ++dy) {
+        for (int dx = -radius; dx <= radius; ++dx) {
+            if (dx*dx + dy*dy <= radius * radius) {
+                SDL_RenderDrawPoint(ren, cx + dx, cy + dy);
+            }
+        }
+    }
+}
+
+static void draw_circle_outline(SDL_Renderer* ren, int cx, int cy, int radius,
+                                 uint8_t r, uint8_t g, uint8_t b, uint8_t a) {
+    SDL_SetRenderDrawBlendMode(ren, SDL_BLENDMODE_BLEND);
+    SDL_SetRenderDrawColor(ren, r, g, b, a);
+    for (int a = 0; a < 360; a += 2) {
+        float rad = a * 3.14159265358979323846f / 180.0f;
+        int px = cx + static_cast<int>(radius * std::cos(rad));
+        int py = cy + static_cast<int>(radius * std::sin(rad));
+        SDL_RenderDrawPoint(ren, px, py);
+    }
+}
+
+static void draw_digit(SDL_Renderer* ren, int x, int y, int digit, int size) {
+    SDL_SetRenderDrawColor(ren, 255, 255, 255, 255);
+    
+    bool segs[10][7] = {
+        {1,1,1,1,1,1,0}, {0,1,1,0,0,0,0}, {1,1,0,1,1,0,1}, {1,1,1,1,0,0,1}, {0,1,1,0,0,1,1},
+        {1,0,1,1,0,1,1}, {1,0,1,1,1,1,1}, {1,1,1,0,0,0,0}, {1,1,1,1,1,1,1}, {1,1,1,1,0,1,1}
+    };
+    
+    if (digit < 0 || digit > 9) return;
+    
+    int w = size * 2;
+    int h = size * 3;
+    SDL_Rect rects[7] = {
+        {x, y, w, size/2}, {x+w-size/2, y, size/2, h/2}, {x+w-size/2, y+h/2, size/2, h/2},
+        {x, y+h-size/2, w, size/2}, {x, y+h/2, size/2, h/2}, {x, y, size/2, h/2},
+        {x, y+h/2-size/4, w, size/2}
+    };
+    
+    for (int i = 0; i < 7; ++i) {
+        if (segs[digit][i]) SDL_RenderFillRect(ren, &rects[i]);
+    }
+}
+
+static void draw_number(SDL_Renderer* ren, int x, int y, int num, int size) {
+    if (num > 99) num = 99;
+    if (num < 0) num = 0;
+    if (num >= 10) {
+        draw_digit(ren, x, y, num / 10, size);
+        draw_digit(ren, x + size * 3, y, num % 10, size);
+    } else {
+        draw_digit(ren, x, y, num, size);
+    }
+}
+
 int main(int argc, char** argv) {
     if (SDL_Init(SDL_INIT_VIDEO) != 0) {
         std::cerr << "SDL_Init failed: " << SDL_GetError() << "\n";
@@ -37,7 +94,7 @@ int main(int argc, char** argv) {
 
     int window_w = GRID_W * SCALE;
     int window_h = GRID_H * SCALE;
-    SDL_Window* win = SDL_CreateWindow("Micro-Physics Simulator",
+    SDL_Window* win = SDL_CreateWindow("Physics Sim [1-Sand 2-Water 3-Wall 4-Erase C-Clear]",
                                        SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
                                        window_w, window_h, SDL_WINDOW_SHOWN);
     if (!win) {
@@ -55,8 +112,6 @@ int main(int argc, char** argv) {
     }
 
     Simulation sim(GRID_W, GRID_H);
-
-    // create texture to upload grid (ARGB)
     SDL_Texture* tex = SDL_CreateTexture(ren, SDL_PIXELFORMAT_ARGB8888,
                                          SDL_TEXTUREACCESS_STREAMING, sim.W, sim.H);
     if (!tex) {
@@ -72,19 +127,18 @@ int main(int argc, char** argv) {
     bool mouse_down = false;
     bool right_down = false;
     int mouse_x = 0, mouse_y = 0;
-    int paint_grid_x = 0, paint_grid_y = 0;
 
-    // initial paint material = SAND
     sim.set_paint_material(SAND);
 
-    // Simple initial scene (optional)
-    for (int x = sim.W/4; x < sim.W*3/4; ++x) {
-        sim.grid[sim.idx(x, sim.H-1)] = WALL;
+    // Initial ground
+    for (int x = 0; x < sim.W; ++x) {
+        sim.grid[sim.W * (sim.H-1) + x] = WALL;
     }
 
     Uint32 last = SDL_GetTicks();
     const int TARGET_FPS = 60;
-    const int STEP_PER_FRAME = 1; // simulation steps per frame (tune)
+    const int STEP_PER_FRAME = 2;
+    
     while (running) {
         SDL_Event e;
         while (SDL_PollEvent(&e)) {
@@ -99,77 +153,83 @@ int main(int argc, char** argv) {
             } else if (e.type == SDL_MOUSEMOTION) {
                 mouse_x = e.motion.x;
                 mouse_y = e.motion.y;
-                // convert to grid coords
-                paint_grid_x = mouse_x / SCALE;
-                paint_grid_y = mouse_y / SCALE;
             } else if (e.type == SDL_KEYDOWN) {
                 SDL_Keycode k = e.key.keysym.sym;
                 if (k == SDLK_ESCAPE) running = false;
                 else if (k == SDLK_1) sim.set_paint_material(SAND);
                 else if (k == SDLK_2) sim.set_paint_material(WATER);
                 else if (k == SDLK_3) sim.set_paint_material(WALL);
-                else if (k == SDLK_4) sim.set_paint_material(EMPTY); // air / eraser
-                else if (k == SDLK_UP) sim.set_brush_radius(std::min(50, sim.brush_radius + 1));
-                else if (k == SDLK_DOWN) sim.set_brush_radius(std::max(1, sim.brush_radius - 1));
+                else if (k == SDLK_4) sim.set_paint_material(EMPTY);
+                else if (k == SDLK_UP || k == SDLK_EQUALS || k == SDLK_PLUS) {
+                    sim.set_brush_radius(std::min(50, sim.brush_radius + 1));
+                }
+                else if (k == SDLK_DOWN || k == SDLK_MINUS) {
+                    sim.set_brush_radius(std::max(1, sim.brush_radius - 1));
+                }
+                else if (k == SDLK_c) {
+                    std::fill(sim.grid.begin(), sim.grid.end(), EMPTY);
+                }
             }
         }
 
-        // painting while holding mouse
+        int paint_grid_x = mouse_x / SCALE;
+        int paint_grid_y = mouse_y / SCALE;
+
         if (mouse_down) {
             sim.paint_at(paint_grid_x, paint_grid_y);
         } else if (right_down) {
-            // right mouse: erase
             uint8_t prev = sim.paint_material;
             sim.set_paint_material(EMPTY);
             sim.paint_at(paint_grid_x, paint_grid_y);
             sim.set_paint_material(prev);
         }
 
-        // do a few simulation steps per frame
-        for (int i = 0; i < STEP_PER_FRAME; ++i) sim.step_once();
+        for (int i = 0; i < STEP_PER_FRAME; ++i) {
+            sim.step_once();
+        }
 
-        // upload sim to texture
         upload_texture(tex, sim);
 
-        // render scaled texture
+        SDL_SetRenderDrawColor(ren, 0, 0, 0, 255);
         SDL_RenderClear(ren);
         SDL_Rect dst = { 0, 0, sim.W * SCALE, sim.H * SCALE };
         SDL_RenderCopy(ren, tex, nullptr, &dst);
 
-        // draw brush preview (circle) in screen/pixel coords (before present)
+        // Brush preview
         int brush_px = sim.brush_radius * SCALE;
-        int cx = mouse_x;
-        int cy = mouse_y;
-        SDL_SetRenderDrawBlendMode(ren, SDL_BLENDMODE_BLEND);
-        // translucent white fill
-        SDL_SetRenderDrawColor(ren, 255, 255, 255, 80);
-        for (int dy = -brush_px; dy <= brush_px; ++dy) {
-            for (int dx = -brush_px; dx <= brush_px; ++dx) {
-                if (dx*dx + dy*dy <= brush_px * brush_px) {
-                    SDL_RenderDrawPoint(ren, cx + dx, cy + dy);
-                }
-            }
-        }
-        // outline to make it readable
-        SDL_SetRenderDrawColor(ren, 0, 0, 0, 200);
-        for (int a = 0; a < 360; ++a) {
-            float rad = a * 3.14159265358979323846f / 180.0f;
-            int px = cx + int(brush_px * cos(rad));
-            int py = cy + int(brush_px * sin(rad));
-            SDL_RenderDrawPoint(ren, px, py);
-        }
+        uint32_t mat_color = material_color(sim.paint_material);
+        uint8_t r = (mat_color >> 16) & 0xFF;
+        uint8_t g = (mat_color >> 8) & 0xFF;
+        uint8_t b = mat_color & 0xFF;
+        
+        draw_filled_circle(ren, mouse_x, mouse_y, brush_px, r, g, b, 60);
+        draw_circle_outline(ren, mouse_x, mouse_y, brush_px, 255, 255, 255, 200);
+        draw_circle_outline(ren, mouse_x, mouse_y, brush_px + 1, 0, 0, 0, 200);
 
-        // draw brush size as number (simple rectangle + number using SDL_RenderDraw* because we don't have text)
-        // For now draw a small box with the number using rectangle + ascii art is not trivial,
-        // so we just draw circles; if you want text install SDL_ttf and draw the number.
-        // (This comment tells you how to extend.)
+        // UI: Brush size indicator
+        SDL_Rect bg_rect = {10, 10, 60, 40};
+        SDL_SetRenderDrawBlendMode(ren, SDL_BLENDMODE_BLEND);
+        SDL_SetRenderDrawColor(ren, 0, 0, 0, 180);
+        SDL_RenderFillRect(ren, &bg_rect);
+        SDL_SetRenderDrawColor(ren, 255, 255, 255, 255);
+        SDL_RenderDrawRect(ren, &bg_rect);
+        draw_number(ren, 20, 18, sim.brush_radius, 3);
+
+        // Material color indicator
+        SDL_Rect mat_rect = {10, 60, 80, 25};
+        SDL_SetRenderDrawColor(ren, 0, 0, 0, 180);
+        SDL_RenderFillRect(ren, &mat_rect);
+        SDL_SetRenderDrawColor(ren, r, g, b, 255);
+        SDL_Rect color_rect = {15, 65, 15, 15};
+        SDL_RenderFillRect(ren, &color_rect);
 
         SDL_RenderPresent(ren);
 
-        // simple framerate cap
         Uint32 now = SDL_GetTicks();
         Uint32 elapsed = now - last;
-        if (elapsed < 1000 / TARGET_FPS) SDL_Delay( (1000 / TARGET_FPS) - elapsed );
+        if (elapsed < 1000 / TARGET_FPS) {
+            SDL_Delay((1000 / TARGET_FPS) - elapsed);
+        }
         last = SDL_GetTicks();
     }
 
