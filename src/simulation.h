@@ -1,48 +1,31 @@
-#pragma once
-// Simulation class interface for falling-sand multi-material CA
+// simulation.h
+#ifndef SIMULATION_H
+#define SIMULATION_H
 
-#include "materials.h"
 #include <vector>
 #include <cstdint>
 
 class Simulation {
 public:
-    Simulation(int w, int h, unsigned rng_seed = 0);
+    Simulation(int w, int h);
 
-    int width() const;
-    int height() const;
+    void step_once();                 // perform one CA update
+    void paint_at(int gx, int gy);    // paint at grid cell (gx,gy) using current brush radius & material
 
-    // Update the simulation: do 'substeps' internal CA updates.
-    // 'frame_count' is used for scan-order alternation.
-    void step(int substeps, int &frame_count);
+    void set_brush_radius(int r) { brush_radius = r; }
+    void set_paint_material(uint8_t m) { paint_material = m; }
 
-    // paint material at grid coord (x,y) with current brush radius
-    void paint_at(int gx, int gy, int brush_radius);
+    // public for simple access from main
+    int W, H;
+    std::vector<uint8_t> grid;       // current grid material ids
+    std::vector<uint8_t> next_grid;  // next step
+    std::vector<uint8_t> inclusion;  // optional overlay/selection flags
 
-    // clear grid
-    void clear();
-
-    // set/get paint material and view mode
-    void set_paint_material(Cell m);
-    Cell get_paint_material() const;
-    void set_view_mode(int vm);
-    int get_view_mode() const;
-
-    // inclusion (black dots inside sand) control
-    void set_inclusion_chance(double p); // 0..1
-    double get_inclusion_chance() const;
-
-    // read pixel color for render
-    uint32_t pixel_color_at(int x, int y) const;
+    int brush_radius = 4;
+    uint8_t paint_material = 1; // default = SAND
 
 private:
-    int W, H;
-    std::vector<uint8_t> grid;       // cell material enum values
-    std::vector<uint8_t> next_grid;
-    std::vector<uint8_t> inclusion;  // overlay: 0/1 marking inclusion dot inside sand (visual-only)
-    double inclusion_chance;
-    Cell paint_material;
-    int view_mode;
-    unsigned rng_seed;
-    // RNG functions hidden in cpp
+    inline int idx(int x, int y) const { return y * W + x; }
 };
+
+#endif // SIMULATION_H
