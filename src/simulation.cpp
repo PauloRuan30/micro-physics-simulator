@@ -1,6 +1,7 @@
 #include "simulation.h"
 #include "materials.h"
 #include <random>
+#include <chrono>
 #include <algorithm>
 #include <cstring>
 #include <cassert>

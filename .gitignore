@@ -39,3 +39,10 @@
 
 # debug information files
 *.dwo
+
+# Xmake generated files
+.xmake/
+build/
+xmake.out
+xmake.log
+xmake.lock
