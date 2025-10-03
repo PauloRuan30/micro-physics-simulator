@@ -1,10 +1,9 @@
 add_rules("mode.debug", "mode.release")
 
--- require SDL2 (xmake package system)
-add_requires("sdl2 >=2.0.0")
+add_requires("libsdl2")
 
-target("sand")
+target("micro-physics-simulator")
 set_kind("binary")
 set_languages("c++17")
 add_files("src/*.cpp")
-add_packages("sdl2")
+add_packages("libsdl2")
