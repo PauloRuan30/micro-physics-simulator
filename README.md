@@ -1,4 +1,4 @@
-# Micro-Physics Simulator
+# Micro Physics Simulator
 
 A simple falling sand simulation with multiple materials built using C++ and SDL2.
 
@@ -11,23 +11,18 @@ A simple falling sand simulation with multiple materials built using C++ and SDL
 
 ## Controls
 
-### Material Selection
-- `1` - Sand (falls and piles up)
-- `2` - Water (flows and spreads)
-- `3` - Wall (static obstacle)
-- `4` - Air/Eraser (remove materials)
-
-### Brush Controls
-- `UP` or `+` - Increase brush size
-- `DOWN` or `-` - Decrease brush size
-
-### Mouse Controls
-- `Left Click + Drag` - Paint selected material
-- `Right Click + Drag` - Erase
-
-### Other
-- `C` - Clear screen
-- `ESC` - Exit
+| Category | Key / Action | Description |
+|----------|--------------|-------------|
+| **Materials** | `1` | **Sand** - falls and piles up |
+| | `2` | **Water** - flows and spreads |
+| | `3` | **Wall** - static obstacle |
+| | `4` | **Air/Eraser** - remove materials |
+| **Brush** | `↑` or `+` | Increase brush size |
+| | `↓` or `-` | Decrease brush size |
+| **Mouse** | Left Click + Drag | Paint selected material |
+| | Right Click + Drag | Erase materials |
+| **Actions** | `C` | Clear screen |
+| | `ESC` | Exit application |
 
 ## Building
 
@@ -39,6 +34,7 @@ A simple falling sand simulation with multiple materials built using C++ and SDL
 ### Build Instructions
 
 ```bash
+
 # Install xmake
 curl -fsSL https://xmake.io/shget.text | bash
 
