@@ -45,7 +45,7 @@ git clone https://github.com/PauloRuan30/micro-physics-simulator.git
 cd micro-physics-simulator
 
 # Build project
-xmake
+xmake Build
 
 # Run
 xmake run 
