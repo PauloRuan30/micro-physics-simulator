@@ -38,6 +38,12 @@ A simple falling sand simulation with multiple materials built using C++ and SDL
 # Install xmake
 curl -fsSL https://xmake.io/shget.text | bash
 
+# Clone the project
+git clone https://github.com/PauloRuan30/micro-physics-simulator.git
+
+# Enter the main folder
+cd micro-physics-simulator
+
 # Build project
 xmake
 
